@@ -12,7 +12,9 @@ struct page_info {
 	struct list_head list;
 	unsigned long pfn;
 	int8_t last_cpu; // for free_promote area
+	int write;
 	u8 access_bitmap;
+	u8 write_bitmap;
 };
 #endif
 
@@ -40,9 +42,12 @@ extern unsigned int trylock_busy(struct page *page);
 extern void unlock_busy(struct page *page);
 extern void add_page_for_exchange(struct page *page, int node);
 extern void add_page_for_tracking(struct page *page, unsigned int prev_lv);
-extern unsigned int mod_page_access_lv(struct page *page, unsigned int accessed);
+extern unsigned int mod_page_access_lv(struct page *page, unsigned int accessed, unsigned int shared);
+extern unsigned int mod_page_write_lv(struct page *page, int write);
 extern unsigned int get_page_access_lv(struct page *page);
+extern unsigned int get_page_write_lv(struct page *page);
 extern void reset_page_access_lv(struct page *page);
+extern void reset_page_write_lv(struct page *page);
 
 extern int get_page_last_cpu(struct page *page);
 extern void set_page_last_cpu(struct page *page, int cpu);
@@ -55,6 +60,7 @@ extern int find_best_migration_node(struct page *page, int target_nid);
 extern unsigned int background_demotion;
 extern unsigned int batch_demotion;
 extern unsigned int thp_mt_copy;
+extern unsigned int shared_bit_threshold;
 
 #ifdef CONFIG_PAGE_BALANCING_DEBUG
 extern void trace_dump_page(struct page *page, const char *msg);

@@ -85,7 +85,11 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 			 */
 			if (prot_numa) {
 				struct page *page;
+				struct page_info *pi = NULL;
+				pg_data_t *pgdat = NULL;
 				int nid;
+				unsigned int shared = 0;
+				unsigned int shared_level = 0;
 
 				page = vm_normal_page(vma, addr, oldpte);
 				if (!page || PageKsm(page))
@@ -97,6 +101,12 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 					continue;
 
 				/*
+				__dump_page(page, "HJY");
+				printk("page_count: %d\n", page_count(page));
+				printk("private: %lu\n", page->private);
+				*/
+
+				/*
 				 * While migration can move some dirty pages,
 				 * it cannot move them all from MIGRATE_ASYNC
 				 * context.
@@ -105,12 +115,39 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 					continue;
 
 				nid = page_to_nid(page);
+				pgdat = page_pgdat(page);
 
 				/* Avoid TLB flush if possible */
 				if (pte_protnone(oldpte)) {
 					if (mode & NUMA_BALANCING_OPM) {
 						/* The page is not accessed in last scan period */
-						prev_lv = mod_page_access_lv(page, 0);
+						pi = get_page_info_from_page(page);
+						/*
+						if (pi)
+							pr_warn("pfn=%p, write=%d, shared=%d\n", page, pi->write, pi->shared);
+							*/
+						//pr_warn("[HJY] pfn=%p, mm_count=%d, mm_users=%d, refcount=%d\n", page, atomic_read(&vma->vm_mm->mm_count), atomic_read(&vma->vm_mm->mm_users), page_count(page));
+
+						//prev_lv = mod_page_write_lv(page, pi->write);
+						// HJY: compare mm_count with shared_bit_threshold
+						if (atomic_read(&vma->vm_mm->mm_count) > shared_bit_threshold)
+							shared = 1;
+
+						// HJY: pass shared bit
+						prev_lv = mod_page_access_lv(page, 0, shared);
+
+						// HJY: count set bit by thread count
+						if (shared && pgdat)
+							pgdat->lap_area[prev_lv].set_by_refcount++;
+						
+						// HJY: count thread count
+						shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;
+
+						if (shared_level < 4)
+							pgdat->lap_area[prev_lv].refcount_array[shared_level]++;
+						else
+							pgdat->lap_area[prev_lv].refcount_array[4]++;
+
 						add_page_for_tracking(page, prev_lv);
 					}
 					continue;
@@ -118,7 +155,22 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 
 				/* The page is accessed in last scan period */
 				if (mode & NUMA_BALANCING_OPM) {
-					prev_lv = mod_page_access_lv(page, 1);
+					pi = get_page_info_from_page(page);
+					//pr_warn("[HJY] pfn=%p, mm_count=%d, mm_users=%d, refcount=%d\n", page, atomic_read(&vma->vm_mm->mm_count), atomic_read(&vma->vm_mm->mm_users), page_count(page));
+					/*
+					if (pi)
+						pr_warn("pfn=%p, write=%d, shared=%d\n", page, pi->write, pi->shared);
+						*/
+					//prev_lv = mod_page_write_lv(page, pi->write);
+					prev_lv = mod_page_access_lv(page, 1, shared);
+
+					shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;
+
+					if (shared_level < 4)
+						pgdat->lap_area[prev_lv].refcount_array[shared_level]++;
+					else
+						pgdat->lap_area[prev_lv].refcount_array[4]++;
+
 					add_page_for_tracking(page, prev_lv);
 				}
 

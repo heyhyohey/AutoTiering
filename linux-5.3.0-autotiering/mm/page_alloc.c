@@ -8689,13 +8689,17 @@ bool set_hwpoison_free_buddy_page(struct page *page)
 
 void deferred_list_init(struct pglist_data *pgdat)
 {
-	int lv;
+	int lv, ref;
 
 	INIT_LIST_HEAD(&pgdat->deferred_list);
 	for (lv = 0; lv <= MAX_ACCESS_LEVEL; lv++) {
 		INIT_LIST_HEAD(&pgdat->lap_area[lv].lap_list);
 		pgdat->lap_area[lv].nr_free = 0;
 		pgdat->lap_area[lv].demotion_count = 0;
+		pgdat->lap_area[lv].set_by_refcount = 0;
+		for (ref = 0; ref <= 4; ref++) {
+			pgdat->lap_area[lv].refcount_array[ref] = 0;
+		}
 	}
 }
 

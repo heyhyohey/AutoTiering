@@ -104,6 +104,8 @@ struct lap_area {
 	struct list_head	lap_list; // Least-Accessed Page list
 	long long		nr_free;
 	unsigned long		demotion_count; // demotion count per LAP level
+	unsigned long		set_by_refcount; // the number of set bits by refcount
+	unsigned long		refcount_array[5]; // refcount count per LAP level
 };
 
 /* Used for pages not on another list */

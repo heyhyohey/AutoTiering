@@ -2546,6 +2546,11 @@ static vm_fault_t do_wp_page(struct vm_fault *vmf)
 	struct vm_area_struct *vma = vmf->vma;
 
 	vmf->page = vm_normal_page(vma, vmf->address, vmf->orig_pte);
+	/*
+	if (vmf->page)
+		printk(KERN_ALERT"[HJY] refcount=%d, mapcount=%d", page_ref_count(vmf->page), page_mapcount(vmf->page));
+		*/
+
 	if (!vmf->page) {
 		/*
 		 * VM_MIXEDMAP !pfn_valid() case, or VM_SOFTDIRTY clear on a
@@ -3663,6 +3668,7 @@ static vm_fault_t do_numa_page(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct page *page = NULL;
+	struct page_info *pi = NULL;
 	int page_nid = NUMA_NO_NODE;
 	int last_cpupid;
 	int target_nid;
@@ -3707,6 +3713,8 @@ static vm_fault_t do_numa_page(struct vm_fault *vmf)
 		return 0;
 	}
 
+	// printk(KERN_ALERT"[HJY] mapcount=%d, refcount=%d", page_ref_count(page), page_mapcount(page));
+
 	/* TODO: handle PTE-mapped THP */
 	if (PageCompound(page)) {
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
@@ -3730,6 +3738,16 @@ static vm_fault_t do_numa_page(struct vm_fault *vmf)
 	 */
 	if (page_mapcount(page) > 1 && (vma->vm_flags & VM_SHARED))
 		flags |= TNF_SHARED;
+
+	// HJY: dump page
+	/*
+	pr_warn("TNF_WRITE:%d", flags & TNF_WRITE? 1 : 0);
+	*/
+	pi = get_page_info_from_page(page);
+	if (pi)
+		pi->write = flags & TNF_WRITE ? 1 : 0;
+	else
+		pr_warn("no page_info\n");
 
 	last_cpupid = page_cpupid_last(page);
 	page_nid = page_to_nid(page);

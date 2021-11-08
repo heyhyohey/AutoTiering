@@ -1700,11 +1700,26 @@ static void lap_show_print(struct seq_file *m, pg_data_t *pgdat)
 
 static void lap_count_show_print(struct seq_file *m, pg_data_t *pgdat)
 {
-	int order;
+	int order, ref;
 
 	seq_printf(m, "Node %d ", pgdat->node_id);
-	for (order = 0; order <= MAX_ACCESS_LEVEL; order++)
+	for (order = 0; order <= MAX_ACCESS_LEVEL; order++) {
 		seq_printf(m, "%7lu ", pgdat->lap_area[order].demotion_count);
+	}
+	seq_putc(m, '\n');
+	seq_printf(m, "Number of set bit by refcount\n");
+	seq_printf(m, "Node %d ", pgdat->node_id);
+	for (order = 0; order <= MAX_ACCESS_LEVEL; order++) {
+		seq_printf(m, "%7lu ", pgdat->lap_area[order].set_by_refcount);
+	}
+	seq_putc(m, '\n');
+	seq_printf(m, "Node %d refcount\n", pgdat->node_id);
+	for (order = 0; order <= MAX_ACCESS_LEVEL; order++) {
+		for (ref = 0; ref <= 4; ref++) {
+			seq_printf(m, "%2d-%2d:%7lu ", ref * 50, (ref + 1) * 50, pgdat->lap_area[order].refcount_array[ref]);
+		}
+		seq_putc(m, '\n');
+	}
 	seq_putc(m, '\n');
 }
 

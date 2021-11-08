@@ -23,6 +23,7 @@ unsigned int background_demotion = 0;
 unsigned int batch_demotion = 0;
 unsigned int thp_mt_copy = 0;
 unsigned int skip_lower_tier = 1;
+unsigned int shared_bit_threshold = 1000;
 
 static bool need_page_balancing(void)
 {
@@ -66,6 +67,19 @@ unsigned int __get_page_access_lv(struct page_info *pi)
 	int i;
 	unsigned int lv = 0;
 	u8 bitmap = pi->access_bitmap;
+
+	for (i = 0; i < ACCESS_HISTORY_SIZE; i++) {
+		lv = lv + (bitmap & 1);
+		bitmap = bitmap >> 1;
+	}
+	return lv;
+}
+
+unsigned int __get_page_write_lv(struct page_info *pi)
+{
+	int i;
+	unsigned int lv = 0;
+	u8 bitmap = pi->write_bitmap;
 
 	for (i = 0; i < ACCESS_HISTORY_SIZE; i++) {
 		lv = lv + (bitmap & 1);
@@ -171,6 +185,7 @@ static inline void __clear_page_info(struct page_ext *page_ext)
 	struct page_info *pi = get_page_info(page_ext);
 	pi->pfn = 0;
 	pi->access_bitmap = 0;
+	pi->write_bitmap = 0;
 }
 
 unsigned int PageTracked(struct page *page)
@@ -309,8 +324,38 @@ static void print_access_history(const char *msg, struct page *page,
 	trace_printk("%s pfn:[%6lx],access:[%8s],lv:[%u],node:[%u],last_cpu[%d]\n",
 			msg, pfn, buf, __get_page_access_lv(pi), node_id, pi->last_cpu);
 }
+
+static void print_write_history(const char *msg, struct page *page,
+		struct page_info *pi)
+{
+	char buf[10];
+	unsigned int i, node_id = page_to_nid(page);
+	unsigned long pfn = page_to_pfn(page);
+	char hi, lo;
+	u8 bitmap = pi->write_bitmap;
+
+	for (i = 0; i < ACCESS_HISTORY_SIZE; i++) {
+		if (bitmap & 1)
+			buf[i] = '1';
+		else
+			buf[i] = '0';
+
+		bitmap = bitmap >> 1;
+	}
+
+	buf[ACCESS_HISTORY_SIZE] = '\0';
+
+	trace_printk("%s pfn:[%6lx],write:[%8s],lv:[%u],node:[%u],last_cpu[%d]\n",
+			msg, pfn, buf, __get_page_write_lv(pi), node_id, pi->last_cpu);
+}
+
 #else
 static inline void print_access_history(const char *msg, struct page *page,
+		struct page_info *pi)
+{
+}
+
+static inline void print_write_history(const char *msg, struct page *page,
 		struct page_info *pi)
 {
 }
@@ -407,6 +452,7 @@ void copy_page_info(struct page *oldpage, struct page *newpage)
 
 	if (mode & NUMA_BALANCING_OPM) {
 		new_pi->access_bitmap = old_pi->access_bitmap;
+		new_pi->write_bitmap = old_pi->write_bitmap;
 
 		print_access_history("migrate-old", oldpage, old_pi);
 		print_access_history("migrate-new", newpage, new_pi);
@@ -428,11 +474,15 @@ void exchange_page_info(struct page *from_page, struct page *to_page)
 
 	tmp_pi.pfn = 0;
 	tmp_pi.access_bitmap = 0;
+	tmp_pi.write_bitmap = 0;
 
 	if (sysctl_numa_balancing_extended_mode & NUMA_BALANCING_OPM) {
 		tmp_pi.access_bitmap = to_pi->access_bitmap;
+		tmp_pi.write_bitmap = to_pi->write_bitmap;
 		to_pi->access_bitmap = from_pi->access_bitmap;
+		to_pi->write_bitmap = from_pi->write_bitmap;
 		from_pi->access_bitmap = tmp_pi.access_bitmap;
+		from_pi->write_bitmap = tmp_pi.write_bitmap;
 
 		print_access_history("exchange-from", from_page, from_pi);
 		print_access_history("exchange-  to", to_page, to_pi);
@@ -523,8 +573,10 @@ void add_page_for_tracking(struct page *page, unsigned int prev_lv)
 	if (thp_enabled && !PageTransHuge(page))
 		return;
 
+	/*
 	if (page_count(page) > 1)
 		return;
+		*/
 
 	page_ext = lookup_page_ext(page);
 	if (unlikely(!page_ext))
@@ -551,6 +603,9 @@ void add_page_for_tracking(struct page *page, unsigned int prev_lv)
 
 	set_page_to_page_info(page, pi);
 
+	print_access_history("HJY", page, pi);
+	print_write_history("HJY", page, pi);
+
 	/* Other lv page move to lap_list with changed lv */
 	if (__PageTracked(page_ext)) {
 		if (lv != prev_lv) {
@@ -560,6 +615,7 @@ void add_page_for_tracking(struct page *page, unsigned int prev_lv)
 		}
 
 		recent = pi->access_bitmap & 0x1;
+		// HJY: Add new policy
 		// Recently accessd
 		if (recent == 1) {
 			list_move_tail(&pi->list, &pgdat->lap_area[lv].lap_list);
@@ -574,6 +630,7 @@ void add_page_for_tracking(struct page *page, unsigned int prev_lv)
 		__SetPageTracked(page_ext);
 
 		recent = pi->access_bitmap & 0x1;
+		// HJY: Add new policy
 		// Recently accessd
 		if (recent == 1) {
 			list_add_tail(&pi->list, &pgdat->lap_area[lv].lap_list);
@@ -644,7 +701,7 @@ void add_page_for_exchange(struct page *page, int node)
 	mod_lruvec_page_state(page, NR_DEFERRED, hpage_nr_pages(page));
 }
 
-unsigned int mod_page_access_lv(struct page *page, unsigned int accessed)
+unsigned int mod_page_access_lv(struct page *page, unsigned int accessed, unsigned int shared)
 {
 	struct page_ext *page_ext = lookup_page_ext(page);
 	struct page_info *pi = get_page_info(page_ext);
@@ -652,10 +709,25 @@ unsigned int mod_page_access_lv(struct page *page, unsigned int accessed)
 
 	// Shfit Left, Recently accessed bit is LSB
 	pi->access_bitmap = ((pi->access_bitmap) << 1);
-	if (accessed)
+	if (accessed || shared)
 		pi->access_bitmap |= 0x1;
 	else
 		pi->access_bitmap &= 0xfe;
+	return prev_lv;
+}
+
+unsigned int mod_page_write_lv(struct page *page, int write)
+{
+	struct page_ext *page_ext = lookup_page_ext(page);
+	struct page_info *pi = get_page_info(page_ext);
+	unsigned int prev_lv = __get_page_write_lv(pi);
+
+	// Shfit Left, Recently accessed bit is LSB
+	pi->write_bitmap = ((pi->write_bitmap) << 1);
+	if (write)
+		pi->write_bitmap |= 0x1;
+	else
+		pi->write_bitmap &= 0xfe;
 	return prev_lv;
 }
 
@@ -672,6 +744,19 @@ unsigned int get_page_access_lv(struct page *page)
 	return __get_page_access_lv(pi);
 }
 
+unsigned int get_page_write_lv(struct page *page)
+{
+	struct page_ext *page_ext;
+	struct page_info *pi;
+
+	if (!(sysctl_numa_balancing_extended_mode & NUMA_BALANCING_OPM))
+		return -1;
+	page_ext = lookup_page_ext(page);
+	pi = get_page_info(page_ext);
+
+	return __get_page_write_lv(pi);
+}
+
 void reset_page_access_lv(struct page *page)
 {
 	struct page_ext *page_ext;
@@ -683,6 +768,19 @@ void reset_page_access_lv(struct page *page)
 	pi = get_page_info(page_ext);
 
 	pi->access_bitmap = (u8) ~(1 << ACCESS_HISTORY_SIZE);
+}
+
+void reset_page_write_lv(struct page *page)
+{
+	struct page_ext *page_ext;
+	struct page_info *pi;
+
+	if (!(sysctl_numa_balancing_extended_mode & NUMA_BALANCING_OPM))
+		return;
+	page_ext = lookup_page_ext(page);
+	pi = get_page_info(page_ext);
+
+	pi->write_bitmap = (u8) ~(1 << ACCESS_HISTORY_SIZE);
 }
 
 /* Traverse migratable nodes from start_nid to all same-tier memory nodes */
@@ -846,6 +944,7 @@ static void init_pages_in_zone(pg_data_t *pgdat, struct zone *zone)
 			pi->pfn = 0;
 			pi->last_cpu = -1;
 			pi->access_bitmap = (u8) ~(1 << ACCESS_HISTORY_SIZE);
+			pi->write_bitmap = (u8) ~(1 << ACCESS_HISTORY_SIZE);
 
 			count++;
 		}
@@ -904,6 +1003,12 @@ static ssize_t background_demotion_show(struct kobject *kobj,
 	}
 }
 
+static ssize_t shared_bit_threshold_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", shared_bit_threshold);
+}
+
 static ssize_t background_demotion_store(struct kobject *kobj,
 		struct kobj_attribute *attr,
 		const char *buf, size_t count)
@@ -920,9 +1025,29 @@ static ssize_t background_demotion_store(struct kobject *kobj,
 	return count;
 }
 
+static ssize_t shared_bit_threshold_store(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		const char *buf, size_t count)
+{
+	unsigned long threshold;
+	int err;
+
+	err = kstrtoul(buf, 10, &threshold);
+	if (err || threshold < 0)
+		return -EINVAL;
+
+	shared_bit_threshold = threshold;
+
+	return count;
+}
+
 static struct kobj_attribute background_demotion_attr =
 __ATTR(background_demotion, 0644, background_demotion_show,
 		background_demotion_store);
+
+static struct kobj_attribute shared_bit_threshold_attr =
+__ATTR(shared_bit_threshold, 0644, shared_bit_threshold_show,
+		shared_bit_threshold_store);
 
 static ssize_t nr_reserved_pages_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -1057,6 +1182,7 @@ __ATTR(skip_lower_tier, 0644, skip_lower_tier_show,
 
 static struct attribute *page_balancing_attr[] = {
 	&background_demotion_attr.attr,
+	&shared_bit_threshold_attr.attr,
 	&batch_demotion_attr.attr,
 	&thp_mt_copy_attr.attr,
 	&skip_lower_tier_attr.attr,
