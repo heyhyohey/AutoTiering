@@ -14,6 +14,7 @@
 #include <linux/exchange.h>
 #include <linux/memcontrol.h>
 #include <linux/node.h>
+#include <linux/sched.h>
 
 #include <linux/page_balancing.h>
 
@@ -23,7 +24,36 @@ unsigned int background_demotion = 0;
 unsigned int batch_demotion = 0;
 unsigned int thp_mt_copy = 0;
 unsigned int skip_lower_tier = 1;
-unsigned int shared_bit_threshold = 1000;
+unsigned int shared_bit_threshold = 0;
+
+unsigned int traverse_siblings(struct task_struct *t) {
+	struct list_head *list;
+	unsigned int siblings = 0;
+
+	list_for_each(list, &t->sibling) {
+		++siblings;
+	}
+
+	return siblings;
+}
+
+unsigned int calculate_siblings(struct vm_area_struct *vma)
+{
+	unsigned int siblings = 0;
+	struct task_struct *t = NULL;
+
+	rcu_read_lock();
+	t = vma->vm_mm->owner;
+	if (vma->vm_mm->owner) {
+		siblings = traverse_siblings(t);
+	} else {
+		pr_warn("No task_struct\n");
+		siblings = 0;
+	}
+	rcu_read_unlock();
+
+	return siblings;
+}
 
 static bool need_page_balancing(void)
 {

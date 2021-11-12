@@ -86,10 +86,12 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 			if (prot_numa) {
 				struct page *page;
 				struct page_info *pi = NULL;
+				struct task_struct *t = NULL;
 				pg_data_t *pgdat = NULL;
 				int nid;
 				unsigned int shared = 0;
 				unsigned int shared_level = 0;
+				unsigned int siblings = 0;
 
 				page = vm_normal_page(vma, addr, oldpte);
 				if (!page || PageKsm(page))
@@ -122,15 +124,23 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 					if (mode & NUMA_BALANCING_OPM) {
 						/* The page is not accessed in last scan period */
 						pi = get_page_info_from_page(page);
+
+						rcu_read_lock();
+						t = vma->vm_mm->owner;
+						rcu_read_unlock();
 						/*
 						if (pi)
 							pr_warn("pfn=%p, write=%d, shared=%d\n", page, pi->write, pi->shared);
 							*/
-						//pr_warn("[HJY] pfn=%p, mm_count=%d, mm_users=%d, refcount=%d\n", page, atomic_read(&vma->vm_mm->mm_count), atomic_read(&vma->vm_mm->mm_users), page_count(page));
 
-						//prev_lv = mod_page_write_lv(page, pi->write);
 						// HJY: compare mm_count with shared_bit_threshold
-						if (atomic_read(&vma->vm_mm->mm_count) > shared_bit_threshold)
+						siblings = calculate_siblings(vma);
+
+						//pr_warn("[HJY] pfn=%p, mm_count=%d, mm_users=%d, mm_struct_refcount=%d, sibling=%u\n", page, atomic_read(&vma->vm_mm->mm_count), 
+						//		atomic_read(&vma->vm_mm->mm_users), page_count(page), sibling);
+
+						if (shared_bit_threshold && (siblings > shared_bit_threshold ||
+								atomic_read(&vma->vm_mm->mm_users) > shared_bit_threshold))
 							shared = 1;
 
 						// HJY: pass shared bit
@@ -156,12 +166,10 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 				/* The page is accessed in last scan period */
 				if (mode & NUMA_BALANCING_OPM) {
 					pi = get_page_info_from_page(page);
-					//pr_warn("[HJY] pfn=%p, mm_count=%d, mm_users=%d, refcount=%d\n", page, atomic_read(&vma->vm_mm->mm_count), atomic_read(&vma->vm_mm->mm_users), page_count(page));
 					/*
 					if (pi)
 						pr_warn("pfn=%p, write=%d, shared=%d\n", page, pi->write, pi->shared);
 						*/
-					//prev_lv = mod_page_write_lv(page, pi->write);
 					prev_lv = mod_page_access_lv(page, 1, shared);
 
 					shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;

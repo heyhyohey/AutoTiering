@@ -24,6 +24,7 @@ extern struct page_ext_operations page_info_ops;
 extern struct page *get_page_from_page_info(struct page_info *page_info);
 extern struct page_info *get_page_info_from_page(struct page *page);
 extern struct page_ext *get_page_ext(struct page_info *page_info);
+extern unsigned int calculate_siblings(struct vm_area_struct *vma);
 
 extern void set_page_to_page_info(struct page *page, struct page_info *page_info);
 extern void clear_page_info(struct page *page);
