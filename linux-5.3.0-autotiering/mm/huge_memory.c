@@ -2007,12 +2007,14 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 				if (shared && pgdat)
 					pgdat->lap_area[prev_lv].set_by_refcount++;
 
+				/*
 				shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;
 
 				if (shared_level < 4)
 					pgdat->lap_area[prev_lv].refcount_array[shared_level]++;
 				else
 					pgdat->lap_area[prev_lv].refcount_array[4]++;
+				*/
 
 				add_page_for_tracking(page, prev_lv);
 			}
@@ -2024,12 +2026,14 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 			//prev_lv = mod_page_write_lv(page, 1);
 			prev_lv = mod_page_access_lv(page, 1, shared);
 
+			/*
 			shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;
 
 			if (shared_level < 4)
 				pgdat->lap_area[prev_lv].refcount_array[shared_level]++;
 			else
 				pgdat->lap_area[prev_lv].refcount_array[4]++;
+			*/
 
 			add_page_for_tracking(page, prev_lv);
 		}

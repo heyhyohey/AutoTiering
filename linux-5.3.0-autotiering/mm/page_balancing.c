@@ -739,7 +739,7 @@ unsigned int mod_page_access_lv(struct page *page, unsigned int accessed, unsign
 
 	// Shfit Left, Recently accessed bit is LSB
 	pi->access_bitmap = ((pi->access_bitmap) << 1);
-	if (accessed || shared)
+	if (accessed && shared)
 		pi->access_bitmap |= 0x1;
 	else
 		pi->access_bitmap &= 0xfe;
