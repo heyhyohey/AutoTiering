@@ -1996,16 +1996,7 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 		if (pmd_protnone(*pmd)) {
 			if (mode & NUMA_BALANCING_OPM) {
 				/* The page is not accessed in last scan period */
-				siblings = calculate_siblings(vma);
-
-				if (shared_bit_threshold && (siblings > shared_bit_threshold ||
-						atomic_read(&vma->vm_mm->mm_count) > shared_bit_threshold))
-					shared = 1;
-
 				prev_lv = mod_page_access_lv(page, 0, shared);
-
-				if (shared && pgdat)
-					pgdat->lap_area[prev_lv].set_by_refcount++;
 
 				/*
 				shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;
@@ -2024,6 +2015,12 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 		/* The page is accessed in last scan period */
 		if (mode & NUMA_BALANCING_OPM) {
 			//prev_lv = mod_page_write_lv(page, 1);
+			siblings = calculate_siblings(vma);
+
+			if (shared_bit_threshold && (siblings > shared_bit_threshold ||
+					atomic_read(&vma->vm_mm->mm_count) > shared_bit_threshold))
+				shared = 1;
+
 			prev_lv = mod_page_access_lv(page, 1, shared);
 
 			/*
@@ -2034,6 +2031,9 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 			else
 				pgdat->lap_area[prev_lv].refcount_array[4]++;
 			*/
+
+			if (shared && pgdat)
+				pgdat->lap_area[prev_lv].set_by_refcount++;
 
 			add_page_for_tracking(page, prev_lv);
 		}

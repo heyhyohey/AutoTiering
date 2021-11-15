@@ -86,7 +86,6 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 			if (prot_numa) {
 				struct page *page;
 				struct page_info *pi = NULL;
-				struct task_struct *t = NULL;
 				pg_data_t *pgdat = NULL;
 				int nid;
 				unsigned int shared = 0;
@@ -124,31 +123,18 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 					if (mode & NUMA_BALANCING_OPM) {
 						/* The page is not accessed in last scan period */
 						pi = get_page_info_from_page(page);
-
-						rcu_read_lock();
-						t = vma->vm_mm->owner;
-						rcu_read_unlock();
 						/*
 						if (pi)
 							pr_warn("pfn=%p, write=%d, shared=%d\n", page, pi->write, pi->shared);
 							*/
 
-						// HJY: compare mm_count with shared_bit_threshold
-						siblings = calculate_siblings(vma);
-
 						//pr_warn("[HJY] pfn=%p, mm_count=%d, mm_users=%d, mm_struct_refcount=%d, sibling=%u\n", page, atomic_read(&vma->vm_mm->mm_count), 
 						//		atomic_read(&vma->vm_mm->mm_users), page_count(page), sibling);
-
-						if (shared_bit_threshold && (siblings > shared_bit_threshold ||
-								atomic_read(&vma->vm_mm->mm_users) > shared_bit_threshold))
-							shared = 1;
 
 						// HJY: pass shared bit
 						prev_lv = mod_page_access_lv(page, 0, shared);
 
 						// HJY: count set bit by thread count
-						if (shared && pgdat)
-							pgdat->lap_area[prev_lv].set_by_refcount++;
 						
 						// HJY: count thread count
 						/*
@@ -172,6 +158,13 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 					if (pi)
 						pr_warn("pfn=%p, write=%d, shared=%d\n", page, pi->write, pi->shared);
 						*/
+					siblings = calculate_siblings(vma);
+
+
+					if (shared_bit_threshold && (siblings > shared_bit_threshold ||
+							atomic_read(&vma->vm_mm->mm_users) > shared_bit_threshold))
+						shared = 1;
+
 					prev_lv = mod_page_access_lv(page, 1, shared);
 
 					/*
@@ -182,6 +175,9 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 					else
 						pgdat->lap_area[prev_lv].refcount_array[4]++;
 					*/
+
+					if (shared && pgdat)
+						pgdat->lap_area[prev_lv].set_by_refcount++;
 
 					add_page_for_tracking(page, prev_lv);
 				}
