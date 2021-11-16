@@ -1974,13 +1974,11 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 
 	if (prot_numa) {
 		struct page *page;
-		//struct page_info *pi;
 		int prev_lv;
 		int mode = sysctl_numa_balancing_extended_mode;
-		unsigned int shared = 0;
+		unsigned int shared = 1;
 		unsigned int shared_level = 0;
 		unsigned int siblings = 0;
-		pg_data_t *pgdat = NULL;
 		/*
 		 * Avoid trapping faults against the zero page. The read-only
 		 * data is likely to be read-cached on the local CPU and
@@ -1990,23 +1988,12 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 			goto unlock;
 
 		page = pmd_page(*pmd);
-		pgdat = page_pgdat(page);
 
 		/* Avoid TLB flush if possible */
 		if (pmd_protnone(*pmd)) {
 			if (mode & NUMA_BALANCING_OPM) {
 				/* The page is not accessed in last scan period */
 				prev_lv = mod_page_access_lv(page, 0, shared);
-
-				/*
-				shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;
-
-				if (shared_level < 4)
-					pgdat->lap_area[prev_lv].refcount_array[shared_level]++;
-				else
-					pgdat->lap_area[prev_lv].refcount_array[4]++;
-				*/
-
 				add_page_for_tracking(page, prev_lv);
 			}
 			goto unlock;
@@ -2014,27 +2001,13 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 
 		/* The page is accessed in last scan period */
 		if (mode & NUMA_BALANCING_OPM) {
-			//prev_lv = mod_page_write_lv(page, 1);
 			siblings = calculate_siblings(vma);
 
-			if (shared_bit_threshold && (siblings > shared_bit_threshold ||
-					atomic_read(&vma->vm_mm->mm_count) > shared_bit_threshold))
-				shared = 1;
+			if (shared_bit_threshold && (siblings < shared_bit_threshold ||
+					atomic_read(&vma->vm_mm->mm_count) < shared_bit_threshold))
+				shared = 0;
 
 			prev_lv = mod_page_access_lv(page, 1, shared);
-
-			/*
-			shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;
-
-			if (shared_level < 4)
-				pgdat->lap_area[prev_lv].refcount_array[shared_level]++;
-			else
-				pgdat->lap_area[prev_lv].refcount_array[4]++;
-			*/
-
-			if (shared && pgdat)
-				pgdat->lap_area[prev_lv].set_by_refcount++;
-
 			add_page_for_tracking(page, prev_lv);
 		}
 	}

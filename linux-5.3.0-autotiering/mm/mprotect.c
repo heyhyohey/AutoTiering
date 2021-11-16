@@ -88,7 +88,7 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 				struct page_info *pi = NULL;
 				pg_data_t *pgdat = NULL;
 				int nid;
-				unsigned int shared = 0;
+				unsigned int shared = 1;
 				unsigned int shared_level = 0;
 				unsigned int siblings = 0;
 
@@ -122,21 +122,9 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 				if (pte_protnone(oldpte)) {
 					if (mode & NUMA_BALANCING_OPM) {
 						/* The page is not accessed in last scan period */
-						pi = get_page_info_from_page(page);
-						/*
-						if (pi)
-							pr_warn("pfn=%p, write=%d, shared=%d\n", page, pi->write, pi->shared);
-							*/
-
 						//pr_warn("[HJY] pfn=%p, mm_count=%d, mm_users=%d, mm_struct_refcount=%d, sibling=%u\n", page, atomic_read(&vma->vm_mm->mm_count), 
 						//		atomic_read(&vma->vm_mm->mm_users), page_count(page), sibling);
-
-						// HJY: pass shared bit
 						prev_lv = mod_page_access_lv(page, 0, shared);
-
-						// HJY: count set bit by thread count
-						
-						// HJY: count thread count
 						/*
 						shared_level = atomic_read(&vma->vm_mm->mm_count) / 50;
 
@@ -145,7 +133,6 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 						else
 							pgdat->lap_area[prev_lv].refcount_array[4]++;
 						*/
-
 						add_page_for_tracking(page, prev_lv);
 					}
 					continue;
@@ -154,16 +141,11 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 				/* The page is accessed in last scan period */
 				if (mode & NUMA_BALANCING_OPM) {
 					pi = get_page_info_from_page(page);
-					/*
-					if (pi)
-						pr_warn("pfn=%p, write=%d, shared=%d\n", page, pi->write, pi->shared);
-						*/
 					siblings = calculate_siblings(vma);
 
-
-					if (shared_bit_threshold && (siblings > shared_bit_threshold ||
-							atomic_read(&vma->vm_mm->mm_users) > shared_bit_threshold))
-						shared = 1;
+					if (shared_bit_threshold && (siblings < shared_bit_threshold ||
+							atomic_read(&vma->vm_mm->mm_users) < shared_bit_threshold))
+						shared = 0;
 
 					prev_lv = mod_page_access_lv(page, 1, shared);
 
@@ -174,10 +156,10 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 						pgdat->lap_area[prev_lv].refcount_array[shared_level]++;
 					else
 						pgdat->lap_area[prev_lv].refcount_array[4]++;
-					*/
 
 					if (shared && pgdat)
 						pgdat->lap_area[prev_lv].set_by_refcount++;
+					*/
 
 					add_page_for_tracking(page, prev_lv);
 				}

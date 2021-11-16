@@ -2399,7 +2399,6 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 	    (vma->vm_flags & VM_EXEC))
 		goto out;
 
-	//__dump_page(page, "HJY");
 	/*
 	 * Also do not migrate dirty pages as not all filesystems can move
 	 * dirty pages in MIGRATE_ASYNC mode which is a waste of cycles.
