@@ -2393,9 +2393,6 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 	u64 start_ts, end_ts;
 	int reserved = 0;
 #endif
-
-	pr_warn("migrate_misplaced_page!\n");
-
 	/*
 	 * Don't migrate file pages that are mapped in multiple processes
 	 * with execute permissions as they are probably shared libraries.
