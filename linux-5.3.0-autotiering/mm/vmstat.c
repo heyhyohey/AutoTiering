@@ -1696,6 +1696,8 @@ static void lap_show_print(struct seq_file *m, pg_data_t *pgdat)
 	for (order = 0; order <= MAX_ACCESS_LEVEL; order++)
 		seq_printf(m, "%7llu ", pgdat->lap_area[order].nr_free);
 	seq_putc(m, '\n');
+	seq_printf(m, "changed / not changed %7lu %7lu", pgdat->changed, pgdat->not_changed);
+	seq_putc(m, '\n');
 }
 
 static void lap_count_show_print(struct seq_file *m, pg_data_t *pgdat)

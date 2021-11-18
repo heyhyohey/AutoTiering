@@ -8692,6 +8692,8 @@ void deferred_list_init(struct pglist_data *pgdat)
 	int lv, ref;
 
 	INIT_LIST_HEAD(&pgdat->deferred_list);
+	pgdat->changed = 0;
+	pgdat->not_changed = 0;
 	for (lv = 0; lv <= MAX_ACCESS_LEVEL; lv++) {
 		INIT_LIST_HEAD(&pgdat->lap_area[lv].lap_list);
 		pgdat->lap_area[lv].nr_free = 0;

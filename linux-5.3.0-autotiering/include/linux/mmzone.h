@@ -790,6 +790,8 @@ typedef struct pglist_data {
 	struct list_head deferred_list;
 	// FIXME: Need to use macro
 	struct lap_area lap_area[9]; // MAX_ACCESS_LEVEL + 1
+	unsigned long not_changed;
+	unsigned long changed;
 #endif
 	/* Fields commonly accessed by the page reclaim scanner */
 	struct lruvec		lruvec;
