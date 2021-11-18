@@ -2227,7 +2227,7 @@ int try_demote_from_busy_node(struct page *fault_page, int busy_nid, unsigned in
 	LIST_HEAD(coldpages);
 
 	fault_lv = get_page_access_lv(fault_page);
-	if (fault_lv > MAX_ACCESS_LEVEL || fault_lv < 0)
+	if (fault_lv < 0)
 		return false;
 
 	/* 1. Try to demote page cache (active & inactive file page) */
