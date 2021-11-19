@@ -23,6 +23,7 @@ unsigned int background_demotion = 0;
 unsigned int batch_demotion = 0;
 unsigned int thp_mt_copy = 0;
 unsigned int skip_lower_tier = 1;
+unsigned int force_demotion_threshold = 0;
 
 static bool need_page_balancing(void)
 {
@@ -655,7 +656,7 @@ unsigned int mod_page_access_lv(struct page *page, unsigned int accessed)
 	if (accessed)
 		pi->access_bitmap |= 0x1;
 	else
-		pi->access_bitmap &= 0xfe;
+		pi->access_bitmap &= 0x00;
 	return prev_lv;
 }
 
@@ -904,6 +905,13 @@ static ssize_t background_demotion_show(struct kobject *kobj,
 	}
 }
 
+static ssize_t force_demotion_threshold_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u demotion out of 10 faults.\n",
+			force_demotion_threshold);
+}
+
 static ssize_t background_demotion_store(struct kobject *kobj,
 		struct kobj_attribute *attr,
 		const char *buf, size_t count)
@@ -920,9 +928,29 @@ static ssize_t background_demotion_store(struct kobject *kobj,
 	return count;
 }
 
+static ssize_t force_demotion_threshold_store(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		const char *buf, size_t count)
+{
+	unsigned long threshold;
+	int err;
+
+	err = kstrtoul(buf, 10, &threshold);
+	if (err || threshold < 0 || threshold > 10)
+		return -EINVAL;
+
+	force_demotion_threshold = threshold;
+
+	return count;
+}
+
 static struct kobj_attribute background_demotion_attr =
 __ATTR(background_demotion, 0644, background_demotion_show,
 		background_demotion_store);
+
+static struct kobj_attribute force_demotion_threshold_attr =
+__ATTR(force_demotion_threshold, 0644, force_demotion_threshold_show,
+		force_demotion_threshold_store);
 
 static ssize_t nr_reserved_pages_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -1061,6 +1089,7 @@ static struct attribute *page_balancing_attr[] = {
 	&thp_mt_copy_attr.attr,
 	&skip_lower_tier_attr.attr,
 	&nr_reserved_pages_attr.attr,
+	&force_demotion_threshold_attr.attr,
 	NULL,
 };
 

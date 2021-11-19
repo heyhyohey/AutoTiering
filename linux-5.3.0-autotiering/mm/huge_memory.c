@@ -1998,7 +1998,7 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 
 		/* The page is accessed in last scan period */
 		if (mode & NUMA_BALANCING_OPM) {
-			prev_lv = mod_page_access_lv(page, 1);
+			prev_lv = mod_page_access_lv(page, 0);
 			add_page_for_tracking(page, prev_lv);
 		}
 	}

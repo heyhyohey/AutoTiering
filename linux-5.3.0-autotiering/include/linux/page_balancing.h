@@ -55,6 +55,7 @@ extern int find_best_migration_node(struct page *page, int target_nid);
 extern unsigned int background_demotion;
 extern unsigned int batch_demotion;
 extern unsigned int thp_mt_copy;
+extern unsigned int force_demotion_threshold;
 
 #ifdef CONFIG_PAGE_BALANCING_DEBUG
 extern void trace_dump_page(struct page *page, const char *msg);

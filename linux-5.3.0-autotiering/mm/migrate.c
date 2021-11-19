@@ -50,6 +50,7 @@
 #include <linux/exchange.h>
 #include <linux/sched/sysctl.h>
 #include <linux/memcontrol.h>
+#include <linux/page_balancing.h>
 
 #include <asm/tlbflush.h>
 
@@ -57,6 +58,9 @@
 #include <trace/events/migrate.h>
 
 #include "internal.h"
+
+extern unsigned int force_demotion_threshold;
+static unsigned int current_demotion_value = 0;
 
 /*
  * migrate_prep() needs to be called before we start compiling a list of pages
@@ -2239,14 +2243,24 @@ int try_demote_from_busy_node(struct page *fault_page, int busy_nid, unsigned in
 	for (i = 0; list_empty(&pgdat->lap_area[i].lap_list) && (i <= MAX_ACCESS_LEVEL); i++)
 		bt_lv++;
 
-	if (fault_lv <= bt_lv) {
+	if(++current_demotion_value > 9)
+		current_demotion_value = 0;
+
+	//pr_warn("current_demotion_value: %u, force_demotion_threshold: %u\n", current_demotion_value, force_demotion_threshold);
+
+	if (!force_demotion_threshold || current_demotion_value > force_demotion_threshold - 1) {
 		count_vm_event(PGPROMOTE_LOW_FREQ_FAIL);
 		spin_unlock_irq(&pgdat->lru_lock);
+		pgdat->lap_area[i].not_changed++;
+		//pr_warn("changed!\n");
 		return false;
+	} else {
+		pgdat->lap_area[i].changed++;
+		//pr_warn("not changed!\n");
 	}
 
 	/* 2. Get anon cold page */
-	for (lv = bt_lv; lv < fault_lv; lv++) {
+	for (lv = bt_lv; lv <= fault_lv; lv++) {
 		if (list_empty(&pgdat->lap_area[lv].lap_list))
 			continue;
 
