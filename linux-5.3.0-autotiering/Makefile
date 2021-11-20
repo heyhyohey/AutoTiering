@@ -2,7 +2,7 @@
 VERSION = 5
 PATCHLEVEL = 3
 SUBLEVEL = 0
-EXTRAVERSION = -autotiering-pm-optimization
+EXTRAVERSION = -autotiering-thread-policy
 NAME = Bobtail Squid
 
 # *DOCUMENTATION*
