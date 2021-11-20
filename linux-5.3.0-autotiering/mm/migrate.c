@@ -2243,10 +2243,8 @@ int try_demote_from_busy_node(struct page *fault_page, int busy_nid, unsigned in
 	for (i = 0; list_empty(&pgdat->lap_area[i].lap_list) && (i <= MAX_ACCESS_LEVEL); i++)
 		bt_lv++;
 
-	if(++current_demotion_value > 9)
+	if(++current_demotion_value > 99)
 		current_demotion_value = 0;
-
-	//pr_warn("current_demotion_value: %u, force_demotion_threshold: %u\n", current_demotion_value, force_demotion_threshold);
 
 	if (!force_demotion_threshold || current_demotion_value > force_demotion_threshold - 1) {
 		count_vm_event(PGPROMOTE_LOW_FREQ_FAIL);

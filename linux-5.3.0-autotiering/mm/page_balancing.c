@@ -908,7 +908,7 @@ static ssize_t background_demotion_show(struct kobject *kobj,
 static ssize_t force_demotion_threshold_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%u demotion out of 10 faults.\n",
+	return sprintf(buf, "%u demotion out of 100 faults.\n",
 			force_demotion_threshold);
 }
 
@@ -936,7 +936,7 @@ static ssize_t force_demotion_threshold_store(struct kobject *kobj,
 	int err;
 
 	err = kstrtoul(buf, 10, &threshold);
-	if (err || threshold < 0 || threshold > 10)
+	if (err || threshold < 0 || threshold > 100)
 		return -EINVAL;
 
 	force_demotion_threshold = threshold;
