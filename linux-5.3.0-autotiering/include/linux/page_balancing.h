@@ -40,7 +40,7 @@ extern unsigned int trylock_busy(struct page *page);
 extern void unlock_busy(struct page *page);
 extern void add_page_for_exchange(struct page *page, int node);
 extern void add_page_for_tracking(struct page *page, unsigned int prev_lv);
-extern unsigned int mod_page_access_lv(struct page *page, unsigned int accessed);
+extern unsigned int mod_page_access_lv(struct page *page, unsigned int accessed, pg_data_t *pgdat);
 extern unsigned int get_page_access_lv(struct page *page);
 extern void reset_page_access_lv(struct page *page);
 
@@ -55,6 +55,7 @@ extern int find_best_migration_node(struct page *page, int target_nid);
 extern unsigned int background_demotion;
 extern unsigned int batch_demotion;
 extern unsigned int thp_mt_copy;
+extern unsigned int access_bit_set_probability;
 
 #ifdef CONFIG_PAGE_BALANCING_DEBUG
 extern void trace_dump_page(struct page *page, const char *msg);

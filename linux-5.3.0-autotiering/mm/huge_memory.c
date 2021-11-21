@@ -1976,6 +1976,7 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 		struct page *page;
 		int prev_lv;
 		int mode = sysctl_numa_balancing_extended_mode;
+		pg_data_t *pgdat;
 		/*
 		 * Avoid trapping faults against the zero page. The read-only
 		 * data is likely to be read-cached on the local CPU and
@@ -1985,12 +1986,13 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 			goto unlock;
 
 		page = pmd_page(*pmd);
+		pgdat = page_pgdat(page);
 
 		/* Avoid TLB flush if possible */
 		if (pmd_protnone(*pmd)) {
 			if (mode & NUMA_BALANCING_OPM) {
 				/* The page is not accessed in last scan period */
-				prev_lv = mod_page_access_lv(page, 0);
+				prev_lv = mod_page_access_lv(page, 0, pgdat);
 				add_page_for_tracking(page, prev_lv);
 			}
 			goto unlock;
@@ -1998,7 +2000,7 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 
 		/* The page is accessed in last scan period */
 		if (mode & NUMA_BALANCING_OPM) {
-			prev_lv = mod_page_access_lv(page, 1);
+			prev_lv = mod_page_access_lv(page, 1, pgdat);
 			add_page_for_tracking(page, prev_lv);
 		}
 	}

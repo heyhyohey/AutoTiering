@@ -1708,6 +1708,26 @@ static void lap_count_show_print(struct seq_file *m, pg_data_t *pgdat)
 	seq_putc(m, '\n');
 }
 
+static void lap_set_bits_print(struct seq_file *m, pg_data_t *pgdat)
+{
+	int order;
+
+	seq_printf(m, "Node %d ", pgdat->node_id);
+	for (order = 0; order <= MAX_ACCESS_LEVEL; order++)
+		seq_printf(m, "%7llu ", pgdat->lap_area[order].set_bits);
+	seq_putc(m, '\n');
+}
+
+static void lap_unset_bits_print(struct seq_file *m, pg_data_t *pgdat)
+{
+	int order;
+
+	seq_printf(m, "Node %d ", pgdat->node_id);
+	for (order = 0; order <= MAX_ACCESS_LEVEL; order++)
+		seq_printf(m, "%7llu ", pgdat->lap_area[order].unset_bits);
+	seq_putc(m, '\n');
+}
+
 static int lap_show(struct seq_file *m, void *arg)
 {
 	pg_data_t *pgdat = (pg_data_t *)arg;
@@ -1718,6 +1738,12 @@ static int lap_show(struct seq_file *m, void *arg)
 
 	seq_printf(m, "LAP pages at order\n");
 	lap_show_print(m, pgdat);
+
+	seq_printf(m, "Set bits\n");
+	lap_set_bits_print(m, pgdat);
+
+	seq_printf(m, "Unset bits\n");
+	lap_unset_bits_print(m, pgdat);
 
 	seq_printf(m, "LAP page demotion counts\n");
 	lap_count_show_print(m, pgdat);

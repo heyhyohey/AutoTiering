@@ -23,6 +23,9 @@ unsigned int background_demotion = 0;
 unsigned int batch_demotion = 0;
 unsigned int thp_mt_copy = 0;
 unsigned int skip_lower_tier = 1;
+unsigned int access_bit_set_probability = 100;
+
+static unsigned int current_access_bit_set_value = 0;
 
 static bool need_page_balancing(void)
 {
@@ -644,7 +647,7 @@ void add_page_for_exchange(struct page *page, int node)
 	mod_lruvec_page_state(page, NR_DEFERRED, hpage_nr_pages(page));
 }
 
-unsigned int mod_page_access_lv(struct page *page, unsigned int accessed)
+unsigned int mod_page_access_lv(struct page *page, unsigned int accessed, pg_data_t *pgdat)
 {
 	struct page_ext *page_ext = lookup_page_ext(page);
 	struct page_info *pi = get_page_info(page_ext);
@@ -652,10 +655,21 @@ unsigned int mod_page_access_lv(struct page *page, unsigned int accessed)
 
 	// Shfit Left, Recently accessed bit is LSB
 	pi->access_bitmap = ((pi->access_bitmap) << 1);
-	if (accessed)
+
+	if(++current_access_bit_set_value > 99)
+		current_access_bit_set_value = 0;
+
+	if (accessed && current_access_bit_set_value < access_bit_set_probability) {
 		pi->access_bitmap |= 0x1;
-	else
+		// pgdat->lap_area[prev_lv].set_bits++;
+	} else {
 		pi->access_bitmap &= 0xfe;
+		/*
+		if (accessed)
+			pgdat->lap_area[prev_lv].unset_bits++;
+		*/
+	}
+
 	return prev_lv;
 }
 
@@ -904,6 +918,13 @@ static ssize_t background_demotion_show(struct kobject *kobj,
 	}
 }
 
+static ssize_t access_bit_set_probability_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "Access bit set probability - %u\n",
+			access_bit_set_probability);
+}
+
 static ssize_t background_demotion_store(struct kobject *kobj,
 		struct kobj_attribute *attr,
 		const char *buf, size_t count)
@@ -920,9 +941,29 @@ static ssize_t background_demotion_store(struct kobject *kobj,
 	return count;
 }
 
+static ssize_t access_bit_set_probability_store(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		const char *buf, size_t count)
+{
+	unsigned long probability;
+	int err;
+
+	err = kstrtoul(buf, 10, &probability);
+	if (err || probability < 0 || probability > 100)
+		return -EINVAL;
+
+	access_bit_set_probability = probability;
+
+	return count;
+}
+
 static struct kobj_attribute background_demotion_attr =
 __ATTR(background_demotion, 0644, background_demotion_show,
 		background_demotion_store);
+
+static struct kobj_attribute access_bit_set_probability_attr =
+__ATTR(access_bit_set_probability, 0644, access_bit_set_probability_show,
+		access_bit_set_probability_store);
 
 static ssize_t nr_reserved_pages_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -1061,6 +1102,7 @@ static struct attribute *page_balancing_attr[] = {
 	&thp_mt_copy_attr.attr,
 	&skip_lower_tier_attr.attr,
 	&nr_reserved_pages_attr.attr,
+	&access_bit_set_probability_attr.attr,
 	NULL,
 };
 

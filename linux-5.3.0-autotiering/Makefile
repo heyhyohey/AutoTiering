@@ -2,7 +2,7 @@
 VERSION = 5
 PATCHLEVEL = 3
 SUBLEVEL = 0
-EXTRAVERSION = -autotiering
+EXTRAVERSION = -autotiering-access-bit-set-probability
 NAME = Bobtail Squid
 
 # *DOCUMENTATION*

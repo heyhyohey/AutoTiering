@@ -86,6 +86,7 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 			if (prot_numa) {
 				struct page *page;
 				int nid;
+				pg_data_t *pgdat;
 
 				page = vm_normal_page(vma, addr, oldpte);
 				if (!page || PageKsm(page))
@@ -105,12 +106,13 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 					continue;
 
 				nid = page_to_nid(page);
+				pgdat = page_pgdat(page);
 
 				/* Avoid TLB flush if possible */
 				if (pte_protnone(oldpte)) {
 					if (mode & NUMA_BALANCING_OPM) {
 						/* The page is not accessed in last scan period */
-						prev_lv = mod_page_access_lv(page, 0);
+						prev_lv = mod_page_access_lv(page, 0, pgdat);
 						add_page_for_tracking(page, prev_lv);
 					}
 					continue;
@@ -118,7 +120,7 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 
 				/* The page is accessed in last scan period */
 				if (mode & NUMA_BALANCING_OPM) {
-					prev_lv = mod_page_access_lv(page, 1);
+					prev_lv = mod_page_access_lv(page, 1, pgdat);
 					add_page_for_tracking(page, prev_lv);
 				}
 
