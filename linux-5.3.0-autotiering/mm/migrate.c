@@ -2242,7 +2242,10 @@ int try_demote_from_busy_node(struct page *fault_page, int busy_nid, unsigned in
 	if (fault_lv <= bt_lv) {
 		count_vm_event(PGPROMOTE_LOW_FREQ_FAIL);
 		spin_unlock_irq(&pgdat->lru_lock);
+		pgdat->lap_area[bt_lv].not_changed++;
 		return false;
+	} else {
+		pgdat->lap_area[bt_lv].changed++;
 	}
 
 	/* 2. Get anon cold page */

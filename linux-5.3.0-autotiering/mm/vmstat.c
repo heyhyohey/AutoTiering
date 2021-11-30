@@ -1708,6 +1708,24 @@ static void lap_count_show_print(struct seq_file *m, pg_data_t *pgdat)
 	seq_putc(m, '\n');
 }
 
+static void lap_changed_pages_print(struct seq_file *m, pg_data_t *pgdat)
+{
+	int order;
+
+	for (order = 0; order <= MAX_ACCESS_LEVEL; order++)
+		seq_printf(m, "%7lu ", pgdat->lap_area[order].changed);
+	seq_putc(m, '\n');
+}
+
+static void lap_not_changed_pages_print(struct seq_file *m, pg_data_t *pgdat)
+{
+	int order;
+
+	for (order = 0; order <= MAX_ACCESS_LEVEL; order++)
+		seq_printf(m, "%7lu ", pgdat->lap_area[order].not_changed);
+	seq_putc(m, '\n');
+}
+
 static int lap_show(struct seq_file *m, void *arg)
 {
 	pg_data_t *pgdat = (pg_data_t *)arg;
@@ -1718,6 +1736,12 @@ static int lap_show(struct seq_file *m, void *arg)
 
 	seq_printf(m, "LAP pages at order\n");
 	lap_show_print(m, pgdat);
+
+	seq_printf(m, "Changed pages\n");
+	lap_changed_pages_print(m, pgdat);
+
+	seq_printf(m, "Not changed pages\n");
+	lap_not_changed_pages_print(m, pgdat);
 
 	seq_printf(m, "LAP page demotion counts\n");
 	lap_count_show_print(m, pgdat);
