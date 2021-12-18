@@ -2,7 +2,7 @@
 VERSION = 5
 PATCHLEVEL = 3
 SUBLEVEL = 0
-EXTRAVERSION = -autotiering
+EXTRAVERSION = -autotiering-mcam-final
 NAME = Bobtail Squid
 
 # *DOCUMENTATION*
