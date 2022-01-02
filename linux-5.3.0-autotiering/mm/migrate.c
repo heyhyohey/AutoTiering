@@ -2211,7 +2211,7 @@ int try_demote_from_busy_node(struct page *fault_page, int busy_nid, unsigned in
 	struct pglist_data *pgdat = NODE_DATA(busy_nid);
 	struct mem_cgroup *memcg = get_mem_cgroup_from_page(fault_page);
 	struct lruvec *lruvec = mem_cgroup_lruvec(pgdat, memcg);
-	struct page_info *pi, *pi2;
+	struct page_info *pi, *pi2, *fpi;
 	struct page *page = NULL;
 	struct page *cold_page = NULL;
 	struct page_ext *page_ext;
@@ -2227,6 +2227,7 @@ int try_demote_from_busy_node(struct page *fault_page, int busy_nid, unsigned in
 	LIST_HEAD(coldpages);
 
 	fault_lv = get_page_access_lv(fault_page);
+	fpi = get_page_info_from_page(fault_page);
 	if (fault_lv > MAX_ACCESS_LEVEL || fault_lv < 0)
 		return false;
 
@@ -2239,10 +2240,31 @@ int try_demote_from_busy_node(struct page *fault_page, int busy_nid, unsigned in
 	for (i = 0; list_empty(&pgdat->lap_area[i].lap_list) && (i <= MAX_ACCESS_LEVEL); i++)
 		bt_lv++;
 
+	if (multi_level_threshold) {
+		if (multi_level_threshold > fpi->multi_level) {
+			count_vm_event(PGPROMOTE_LOW_FREQ_FAIL);
+			spin_unlock_irq(&pgdat->lru_lock);
+			pgdat->lap_area[bt_lv].unchanged_count++;
+			return false;
+		}
+	}
+
+	if (concur_level_threshold) {
+		if (concur_level_threshold > fpi->concur_level) {
+			count_vm_event(PGPROMOTE_LOW_FREQ_FAIL);
+			spin_unlock_irq(&pgdat->lru_lock);
+			pgdat->lap_area[bt_lv].unchanged_count++;
+			return false;
+		}
+	}
+
 	if (fault_lv <= bt_lv) {
 		count_vm_event(PGPROMOTE_LOW_FREQ_FAIL);
 		spin_unlock_irq(&pgdat->lru_lock);
+		pgdat->lap_area[bt_lv].unchanged_count++;
 		return false;
+	} else {
+		pgdat->lap_area[bt_lv].changed_count++;
 	}
 
 	/* 2. Get anon cold page */

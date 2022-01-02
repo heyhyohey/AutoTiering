@@ -14,6 +14,7 @@
 #include <linux/exchange.h>
 #include <linux/memcontrol.h>
 #include <linux/node.h>
+#include <linux/sched.h>
 
 #include <linux/page_balancing.h>
 
@@ -23,6 +24,37 @@ unsigned int background_demotion = 0;
 unsigned int batch_demotion = 0;
 unsigned int thp_mt_copy = 0;
 unsigned int skip_lower_tier = 1;
+unsigned int multi_level_threshold = 0;
+unsigned int concur_level_threshold = 0;
+
+int traverse_siblings(struct task_struct *t)
+{
+	struct list_head *l;
+	int siblings = 0;
+
+	list_for_each(l, &t->sibling) {
+		++siblings;
+	}
+
+	return siblings;
+}
+
+int calculate_siblings(struct vm_area_struct *vma)
+{
+	int siblings = 0;
+	struct task_struct *t = NULL;
+
+	rcu_read_lock();
+	t = vma->vm_mm->owner;
+	if (t) {
+		siblings = traverse_siblings(t);
+	} else {
+		siblings = 0;
+	}
+	rcu_read_unlock();
+
+	return siblings;
+}
 
 static bool need_page_balancing(void)
 {
@@ -171,6 +203,8 @@ static inline void __clear_page_info(struct page_ext *page_ext)
 	struct page_info *pi = get_page_info(page_ext);
 	pi->pfn = 0;
 	pi->access_bitmap = 0;
+	pi->multi_level = 0;
+	pi->concur_level = 0;
 }
 
 unsigned int PageTracked(struct page *page)
@@ -846,6 +880,8 @@ static void init_pages_in_zone(pg_data_t *pgdat, struct zone *zone)
 			pi->pfn = 0;
 			pi->last_cpu = -1;
 			pi->access_bitmap = (u8) ~(1 << ACCESS_HISTORY_SIZE);
+			pi->multi_level = 0;
+			pi->concur_level = 0;
 
 			count++;
 		}
@@ -904,6 +940,18 @@ static ssize_t background_demotion_show(struct kobject *kobj,
 	}
 }
 
+static ssize_t multi_level_threshold_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", multi_level_threshold);
+}
+
+static ssize_t concur_level_threshold_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", concur_level_threshold);
+}
+
 static ssize_t background_demotion_store(struct kobject *kobj,
 		struct kobj_attribute *attr,
 		const char *buf, size_t count)
@@ -920,9 +968,49 @@ static ssize_t background_demotion_store(struct kobject *kobj,
 	return count;
 }
 
+static ssize_t multi_level_threshold_store(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		const char *buf, size_t count)
+{
+	unsigned long threshold;
+	int err;
+
+	err = kstrtoul(buf, 10, &threshold);
+	if (err || threshold < 0)
+		return -EINVAL;
+
+	multi_level_threshold = threshold;
+
+	return count;
+}
+
+static ssize_t concur_level_threshold_store(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		const char *buf, size_t count)
+{
+	unsigned long threshold;
+	int err;
+
+	err = kstrtoul(buf, 10, &threshold);
+	if (err || threshold < 0)
+		return -EINVAL;
+
+	concur_level_threshold = threshold;
+
+	return count;
+}
+
 static struct kobj_attribute background_demotion_attr =
 __ATTR(background_demotion, 0644, background_demotion_show,
 		background_demotion_store);
+
+static struct kobj_attribute multi_level_threshold_attr =
+__ATTR(multi_level_threshold, 0644, multi_level_threshold_show,
+		multi_level_threshold_store);
+
+static struct kobj_attribute concur_level_threshold_attr =
+__ATTR(concur_level_threshold, 0644, concur_level_threshold_show,
+		concur_level_threshold_store);
 
 static ssize_t nr_reserved_pages_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -1057,6 +1145,8 @@ __ATTR(skip_lower_tier, 0644, skip_lower_tier_show,
 
 static struct attribute *page_balancing_attr[] = {
 	&background_demotion_attr.attr,
+	&multi_level_threshold_attr.attr,
+	&concur_level_threshold_attr.attr,
 	&batch_demotion_attr.attr,
 	&thp_mt_copy_attr.attr,
 	&skip_lower_tier_attr.attr,

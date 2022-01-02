@@ -8696,6 +8696,8 @@ void deferred_list_init(struct pglist_data *pgdat)
 		INIT_LIST_HEAD(&pgdat->lap_area[lv].lap_list);
 		pgdat->lap_area[lv].nr_free = 0;
 		pgdat->lap_area[lv].demotion_count = 0;
+		pgdat->lap_area[lv].changed_count = 0;
+		pgdat->lap_area[lv].unchanged_count = 0;
 	}
 }
 

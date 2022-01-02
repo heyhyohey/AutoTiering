@@ -13,6 +13,8 @@ struct page_info {
 	unsigned long pfn;
 	int8_t last_cpu; // for free_promote area
 	u8 access_bitmap;
+	int multi_level;
+	int concur_level;
 };
 #endif
 
@@ -43,6 +45,7 @@ extern void add_page_for_tracking(struct page *page, unsigned int prev_lv);
 extern unsigned int mod_page_access_lv(struct page *page, unsigned int accessed);
 extern unsigned int get_page_access_lv(struct page *page);
 extern void reset_page_access_lv(struct page *page);
+extern int calculate_siblings(struct vm_area_struct *vma);
 
 extern int get_page_last_cpu(struct page *page);
 extern void set_page_last_cpu(struct page *page, int cpu);
@@ -55,6 +58,8 @@ extern int find_best_migration_node(struct page *page, int target_nid);
 extern unsigned int background_demotion;
 extern unsigned int batch_demotion;
 extern unsigned int thp_mt_copy;
+extern unsigned int multi_level_threshold;
+extern unsigned int concur_level_threshold;
 
 #ifdef CONFIG_PAGE_BALANCING_DEBUG
 extern void trace_dump_page(struct page *page, const char *msg);
